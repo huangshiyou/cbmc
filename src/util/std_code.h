@@ -59,6 +59,39 @@ public:
   codet &last_statement();
   const codet &last_statement() const;
   class code_blockt &make_block();
+
+protected:
+  typedef std::vector<codet> code_operandst;
+
+  code_operandst &code_operands()
+  { return (code_operandst &)get_sub(); }
+
+  const code_operandst &code_operands() const
+  { return (const code_operandst &)get_sub(); }
+
+  codet &code_op0()
+  { return code_operands().front(); }
+
+  codet &code_op1()
+  { return code_operands()[1]; }
+
+  codet &code_op2()
+  { return code_operands()[2]; }
+
+  codet &code_op3()
+  { return code_operands()[3]; }
+
+  const codet &code_op0() const
+  { return code_operands().front(); }
+
+  const codet &code_op1() const
+  { return code_operands()[1]; }
+
+  const codet &code_op2() const
+  { return code_operands()[2]; }
+
+  const codet &code_op3() const
+  { return code_operands()[3]; }
 };
 
 namespace detail // NOLINT
@@ -595,12 +628,12 @@ public:
 
   const codet &body() const
   {
-    return to_code(op1());
+    return code_op1();
   }
 
   codet &body()
   {
-    return static_cast<codet &>(op1());
+    return code_op1();
   }
 };
 
@@ -657,12 +690,12 @@ public:
 
   const codet &body() const
   {
-    return to_code(op1());
+    return code_op1();
   }
 
   codet &body()
   {
-    return static_cast<codet &>(op1());
+    return code_op1();
   }
 };
 
@@ -719,12 +752,12 @@ public:
 
   const codet &body() const
   {
-    return to_code(op1());
+    return code_op1();
   }
 
   codet &body()
   {
-    return static_cast<codet &>(op1());
+    return code_op1();
   }
 };
 
@@ -796,12 +829,12 @@ public:
 
   const codet &body() const
   {
-    return to_code(op3());
+    return code_op3();
   }
 
   codet &body()
   {
-    return static_cast<codet &>(op3());
+    return code_op3();
   }
 };
 
@@ -1076,12 +1109,12 @@ public:
 
   codet &code()
   {
-    return static_cast<codet &>(op0());
+    return code_op0();
   }
 
   const codet &code() const
   {
-    return static_cast<const codet &>(op0());
+    return code_op0();
   }
 };
 
@@ -1123,7 +1156,9 @@ public:
   code_switch_caset(
     const exprt &_case_op, const codet &_code):codet(ID_switch_case)
   {
-    add_to_operands(_case_op, _code);
+    operands().resize(2);
+    op0()=_case_op;
+    code_op1()=_code;
   }
 
   bool is_default() const
@@ -1148,12 +1183,12 @@ public:
 
   codet &code()
   {
-    return static_cast<codet &>(op1());
+    return code_op1();
   }
 
   const codet &code() const
   {
-    return static_cast<const codet &>(op1());
+    return code_op1();
   }
 };
 
@@ -1788,12 +1823,12 @@ public:
 
   codet &try_code()
   {
-    return static_cast<codet &>(op0());
+    return code_op0();
   }
 
   const codet &try_code() const
   {
-    return static_cast<const codet &>(op0());
+    return code_op0();
   }
 
   code_declt &get_catch_decl(unsigned i)
