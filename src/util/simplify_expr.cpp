@@ -722,8 +722,10 @@ bool simplify_exprt::simplify_typecast(exprt &expr)
     const exprt &o=to_address_of_expr(operand).object();
 
     // turn &array into &array[0] when casting to pointer-to-element-type
-    if(o.type().id()==ID_array &&
-       base_type_eq(expr_type, pointer_type(o.type().subtype()), ns))
+    if(
+      o.type().id() == ID_array &&
+      base_type_eq(
+        expr_type, pointer_type(to_array_type(o.type()).subtype()), ns))
     {
       expr=address_of_exprt(index_exprt(o, from_integer(0, size_type())));
 
@@ -780,9 +782,10 @@ bool simplify_exprt::simplify_dereference(exprt &expr)
       const index_exprt &old=to_index_expr(address_of.object());
       if(ns.follow(old.array().type()).id()==ID_array)
       {
-        index_exprt idx(old.array(),
-                        plus_exprt(old.index(), pointer.op1()),
-                        ns.follow(old.array().type()).subtype());
+        index_exprt idx(
+          old.array(),
+          plus_exprt(old.index(), pointer.op1()),
+          to_array_type(ns.follow(old.array().type())).subtype());
         simplify_rec(idx);
         expr.swap(idx);
         return false;
@@ -1784,9 +1787,8 @@ bool simplify_exprt::simplify_byte_extract(byte_extract_exprt &expr)
     exprt result=expr.op();
 
     // try proper array or string constant
-    for(const typet *op_type_ptr=&op_type;
-        op_type_ptr->id()==ID_array;
-        op_type_ptr=&(ns.follow(*op_type_ptr).subtype()))
+    for(const typet *op_type_ptr = &op_type; op_type_ptr->id() == ID_array;
+        op_type_ptr = &(to_array_type(*op_type_ptr).subtype()))
     {
       DATA_INVARIANT(*el_size > 0, "arrays must not have zero-sized objects");
       DATA_INVARIANT(
@@ -1795,9 +1797,10 @@ bool simplify_exprt::simplify_byte_extract(byte_extract_exprt &expr)
 
       mp_integer el_bytes = (*el_size) / 8;
 
-      if(base_type_eq(expr.type(), op_type_ptr->subtype(), ns) ||
-         (expr.type().id()==ID_pointer &&
-          op_type_ptr->subtype().id()==ID_pointer))
+      if(
+        base_type_eq(expr.type(), to_array_type(*op_type_ptr).subtype(), ns) ||
+        (expr.type().id() == ID_pointer &&
+         to_array_type(*op_type_ptr).subtype().id() == ID_pointer))
       {
         if(offset%el_bytes==0)
         {
@@ -1809,8 +1812,9 @@ bool simplify_exprt::simplify_byte_extract(byte_extract_exprt &expr)
               from_integer(offset, expr.offset().type()));
           result.make_typecast(expr.type());
 
-          if(!base_type_eq(expr.type(), op_type_ptr->subtype(), ns))
-             result.make_typecast(expr.type());
+          if(!base_type_eq(
+               expr.type(), to_array_type(*op_type_ptr).subtype(), ns))
+            result.make_typecast(expr.type());
 
           expr.swap(result);
           simplify_rec(expr);
@@ -1819,7 +1823,8 @@ bool simplify_exprt::simplify_byte_extract(byte_extract_exprt &expr)
       }
       else
       {
-        auto sub_size = pointer_offset_size(op_type_ptr->subtype(), ns);
+        auto sub_size =
+          pointer_offset_size(to_array_type(*op_type_ptr).subtype(), ns);
 
         if(sub_size.has_value() && *sub_size > 0)
         {
@@ -2120,7 +2125,7 @@ bool simplify_exprt::simplify_byte_update(byte_update_exprt &expr)
   // byte_extract
   if(root.id()==ID_array)
   {
-    auto el_size = pointer_offset_bits(op_type.subtype(), ns);
+    auto el_size = pointer_offset_bits(to_array_type(op_type).subtype(), ns);
 
     if(!el_size.has_value() || *el_size == 0 ||
        (*el_size) % 8 != 0 || (*val_size) % 8 != 0)
