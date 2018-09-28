@@ -348,6 +348,8 @@ static void add_equations_for_symbol_resolution(
     else if(
       lhs.type().id() != ID_pointer && has_char_pointer_subtype(lhs.type(), ns))
     {
+      PRECONDITION(rhs.type().id()!=ID_symbol_type);
+      PRECONDITION(rhs.type().id()!=ID_struct_tag);
       if(rhs.type().id() == ID_struct)
       {
         const struct_typet &struct_type = to_struct_type(rhs.type());
@@ -379,6 +381,8 @@ static void add_equations_for_symbol_resolution(
 static std::vector<exprt> extract_strings_from_lhs(const exprt &lhs)
 {
   std::vector<exprt> result;
+      PRECONDITION(lhs.type().id()!=ID_symbol_type);
+      PRECONDITION(lhs.type().id()!=ID_struct_tag);
   if(lhs.type() == string_typet())
     result.push_back(lhs);
   else if(lhs.type().id() == ID_struct)
@@ -438,6 +442,8 @@ static void add_string_equation_to_symbol_resolution(
   }
   else if(has_subtype(eq.lhs().type(), ID_string, ns))
   {
+      PRECONDITION(eq.rhs().type().id()!=ID_symbol_type);
+      PRECONDITION(eq.rhs().type().id()!=ID_struct_tag);
     if(eq.rhs().type().id() == ID_struct)
     {
       const struct_typet &struct_type = to_struct_type(eq.rhs().type());
@@ -662,7 +668,8 @@ decision_proceduret::resultt string_refinementt::dec_solve()
     const bool node_added = add_node(
       dependencies,
       eq_with_char_array_replaced_with_representative_elements,
-      generator.array_pool);
+      generator.array_pool,
+      ns);
     if(!node_added)
       local_equations.push_back(eq);
   }
