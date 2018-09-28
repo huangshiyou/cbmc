@@ -336,7 +336,7 @@ static void add_equations_for_symbol_resolution(
       continue;
     }
 
-    if(is_char_pointer_type(rhs.type()))
+    if(is_char_pointer_type(rhs.type(), ns))
     {
       symbol_solver.make_union(lhs, rhs);
     }
@@ -353,7 +353,7 @@ static void add_equations_for_symbol_resolution(
         const struct_typet &struct_type = to_struct_type(rhs.type());
         for(const auto &comp : struct_type.components())
         {
-          if(is_char_pointer_type(comp.type()))
+          if(is_char_pointer_type(comp.type(), ns))
           {
             const member_exprt lhs_data(lhs, comp.get_name(), comp.type());
             const exprt rhs_data = simplify_expr(
@@ -1723,7 +1723,7 @@ static void initial_index_set(
   const auto end = axiom.body.depth_end();
   while(it != end)
   {
-    if(it->id() == ID_index && is_char_type(it->type()))
+    if(it->id() == ID_index && is_char_type(it->type(), ns))
     {
       const auto &index_expr = to_index_expr(*it);
       const auto &s = index_expr.array();
@@ -1744,7 +1744,7 @@ static void initial_index_set(
   const auto end = axiom.premise.depth_end();
   while(it!=end)
   {
-    if(it->id() == ID_index && is_char_type(it->type()))
+    if(it->id() == ID_index && is_char_type(it->type(), ns))
     {
       const exprt &s=it->op0();
       const exprt &i=it->op1();
@@ -1779,7 +1779,7 @@ static void update_index_set(
   {
     exprt cur=to_process.back();
     to_process.pop_back();
-    if(cur.id() == ID_index && is_char_type(cur.type()))
+    if(cur.id() == ID_index && is_char_type(cur.type(), ns))
     {
       const exprt &s=cur.op0();
       const exprt &i=cur.op1();
@@ -1968,7 +1968,7 @@ exprt string_refinementt::get(const exprt &expr) const
 
   // Special treatment for index expressions
   const auto &index_expr = expr_try_dynamic_cast<index_exprt>(ecopy);
-  if(index_expr && is_char_type(index_expr->type()))
+  if(index_expr && is_char_type(index_expr->type(), ns))
   {
     std::reference_wrapper<const exprt> current(index_expr->array());
     while(current.get().id() == ID_if)
