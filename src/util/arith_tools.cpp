@@ -14,6 +14,8 @@ Author: Daniel Kroening, kroening@kroening.com
 #include "std_types.h"
 #include "std_expr.h"
 
+#include <algorithm>
+
 bool to_integer(const exprt &expr, mp_integer &int_value)
 {
   if(!expr.is_constant())
@@ -285,11 +287,16 @@ bool get_bvrep_bit(
   std::size_t width,
   std::size_t bit_index)
 {
-  // The representation is binary, using '0'/'1',
-  // most significant bit first.
   PRECONDITION(bit_index < width);
-  PRECONDITION(src.size() == width);
-  return src[src.size() - 1 - bit_index] == '1';
+
+  const auto byte_index = bit_index >> 3;
+
+  if(byte_index >= src.size())
+    return false;
+
+  unsigned char byte = src[src.size() - 1 - byte_index];
+
+  return ((byte >> (bit_index & 7)) & 1) != 0;
 }
 
 /// construct a bit-vector representation from a functor
@@ -299,10 +306,31 @@ bool get_bvrep_bit(
 irep_idt
 make_bvrep(const std::size_t width, const std::function<bool(std::size_t)> f)
 {
-  std::string result(width, ' ');
+  std::string result;
+  result.reserve(width / 8 + 1);
+  unsigned byte = 0;
 
   for(std::size_t i = 0; i < width; i++)
-    result[width - 1 - i] = f(i) ? '1' : '0';
+  {
+    const auto bit_in_byte = i % 8;
+
+    byte |= ((unsigned)f(i)) << bit_in_byte;
+
+    if(bit_in_byte == 7)
+    {
+      result += (char)byte;
+      byte = 0;
+    }
+  }
+
+  if(byte != 0)
+    result += (char)byte;
+
+  // drop leading zeros
+  while(!result.empty() && result.back() == 0)
+    result.resize(result.size() - 1);
+
+  std::reverse(result.begin(), result.end());
 
   return result;
 }
@@ -341,15 +369,65 @@ irep_idt bvrep_bitwise_op(
   });
 }
 
+std::string dump_integer(mp_integer src)
+{
+  std::size_t d = src.digits(256) + 1;
+  unsigned char *buf = new unsigned char[d], *p = buf;
+  src.dump(buf, d);
+  while(d > 0 && *p == 0)
+  {
+    d--;
+    p++;
+  }
+  return std::string((char *)p, d);
+}
+
 /// convert an integer to bit-vector representation with given width
+/// This uses two's complement for negative numbers.
+/// If the value is out of range, it is 'wrapped around'.
 irep_idt integer2bvrep(const mp_integer &src, std::size_t width)
 {
-  return integer2binary(src, width);
+  const mp_integer p = power(2, width);
+
+  if(src.is_negative())
+  {
+    // do two's complement encoding of negative numbers
+    mp_integer tmp = src;
+    tmp.negate();
+    tmp %= p;
+    if(tmp != 0)
+      tmp = p - tmp;
+    return dump_integer(tmp);
+  }
+  else
+  {
+    // we 'wrap around' if 'src' is too large
+    return dump_integer(src % p);
+  }
 }
 
 /// convert a bit-vector representation (possibly signed) to integer
 mp_integer bvrep2integer(const irep_idt &src, std::size_t width, bool is_signed)
 {
-  PRECONDITION(src.size() == width);
-  return binary2integer(id2string(src), is_signed);
+  mp_integer tmp;
+  tmp.load((const unsigned char *)id2string(src).data(), src.size());
+
+  if(is_signed)
+  {
+    PRECONDITION(width >= 1);
+    const auto p = power(2, width - 1);
+    if(tmp >= p)
+    {
+      const auto result = tmp - 2 * p;
+      PRECONDITION(result >= -p);
+      return result;
+    }
+    else
+      return tmp;
+  }
+  else
+  {
+    PRECONDITION(tmp < power(2, width));
+    return tmp;
+  }
 }
