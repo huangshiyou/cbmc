@@ -237,7 +237,6 @@ void remove_exceptionst::instrument_exception_handler(
     t_null->code=code_assignt(
       thrown_global_symbol,
       null_voidptr);
-    t_null->function=instr_it->function;
 
     // add the assignment exc = @inflight_exception (before the null assignment)
     goto_programt::targett t_exc=goto_program.insert_after(instr_it);
@@ -246,7 +245,6 @@ void remove_exceptionst::instrument_exception_handler(
     t_exc->code=code_assignt(
       thrown_exception_local,
       typecast_exprt(thrown_global_symbol, thrown_exception_local.type()));
-    t_exc->function=instr_it->function;
   }
   instr_it->make_skip();
 }
@@ -351,7 +349,6 @@ void remove_exceptionst::add_exception_dispatch_sequence(
         goto_programt::targett t_exc=goto_program.insert_after(instr_it);
         t_exc->make_goto(new_state_pc);
         t_exc->source_location=instr_it->source_location;
-        t_exc->function=instr_it->function;
 
         // use instanceof to check that this is the correct handler
         symbol_typet type(stack_catch[i][j].first);
@@ -376,7 +373,6 @@ void remove_exceptionst::add_exception_dispatch_sequence(
 
   default_dispatch->make_goto(default_target);
   default_dispatch->source_location=instr_it->source_location;
-  default_dispatch->function=instr_it->function;
 
   // add dead instructions
   for(const auto &local : locals)
@@ -385,7 +381,6 @@ void remove_exceptionst::add_exception_dispatch_sequence(
     t_dead->make_dead();
     t_dead->code=code_deadt(local);
     t_dead->source_location=instr_it->source_location;
-    t_dead->function=instr_it->function;
   }
 }
 
@@ -467,7 +462,6 @@ bool remove_exceptionst::instrument_function_call(
       goto_programt::targett t_null=goto_program.insert_after(instr_it);
       t_null->make_goto(next_it);
       t_null->source_location=instr_it->source_location;
-      t_null->function=instr_it->function;
       t_null->guard=no_exception_currently_in_flight;
     }
 
