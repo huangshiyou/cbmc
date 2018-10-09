@@ -124,22 +124,11 @@ public:
     output(ns, goto_model.goto_functions, out);
   }
 
-  void output(
+  virtual void output(
     const namespacet &ns,
+    const irep_idt &function,
     const goto_programt &goto_program,
-    std::ostream &out) const
-  {
-    output(ns, goto_program, "", out);
-  }
-
-  void output(
-    const namespacet &ns,
-    const goto_functionst::goto_functiont &goto_function,
-    std::ostream &out) const
-  {
-    output(ns, goto_function.body, "", out);
-  }
-
+    std::ostream &out) const;
 
   virtual jsont output_json(
     const namespacet &ns,
@@ -152,21 +141,6 @@ public:
     return output_json(ns, goto_model.goto_functions);
   }
 
-  jsont output_json(
-    const namespacet &ns,
-    const goto_programt &goto_program) const
-  {
-    return output_json(ns, goto_program, "");
-  }
-
-  jsont output_json(
-    const namespacet &ns,
-    const goto_functionst::goto_functiont &goto_function) const
-  {
-    return output_json(ns, goto_function.body, "");
-  }
-
-
   virtual xmlt output_xml(
     const namespacet &ns,
     const goto_functionst &goto_functions) const;
@@ -176,20 +150,6 @@ public:
   {
     const namespacet ns(goto_model.symbol_table);
     return output_xml(ns, goto_model.goto_functions);
-  }
-
-  xmlt output_xml(
-    const namespacet &ns,
-    const goto_programt &goto_program) const
-  {
-    return output_xml(ns, goto_program, "");
-  }
-
-  xmlt output_xml(
-    const namespacet &ns,
-    const goto_functionst::goto_functiont &goto_function) const
-  {
-    return output_xml(ns, goto_function.body, "");
   }
 
 protected:
@@ -204,21 +164,15 @@ protected:
   void entry_state(const goto_programt &);
   void entry_state(const goto_functionst &);
 
-  virtual void output(
-    const namespacet &ns,
-    const goto_programt &goto_program,
-    const irep_idt &identifier,
-    std::ostream &out) const;
-
   virtual jsont output_json(
     const namespacet &ns,
-    const goto_programt &goto_program,
-    const irep_idt &identifier) const;
+    const irep_idt &function,
+    const goto_programt &goto_program) const;
 
   virtual xmlt output_xml(
     const namespacet &ns,
-    const goto_programt &goto_program,
-    const irep_idt &identifier) const;
+    const irep_idt &function,
+    const goto_programt &goto_program) const;
 
 
   // the work-queue is sorted by location number
