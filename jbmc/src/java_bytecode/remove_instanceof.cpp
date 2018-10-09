@@ -35,10 +35,14 @@ public:
   }
 
   // Lower instanceof for a single function
-  bool lower_instanceof(goto_programt &);
+  bool lower_instanceof(
+    const irep_idt &function_identifier,
+    goto_programt &);
 
   // Lower instanceof for a single instruction
-  bool lower_instanceof(goto_programt &, goto_programt::targett);
+  bool lower_instanceof(
+    const irep_idt &function_identifier,
+    goto_programt &, goto_programt::targett);
 
 protected:
   symbol_table_baset &symbol_table;
@@ -47,6 +51,7 @@ protected:
   message_handlert &message_handler;
 
   bool lower_instanceof(
+    const irep_idt &function_identifier,
     exprt &, goto_programt &, goto_programt::targett);
 };
 
@@ -58,6 +63,7 @@ protected:
 /// \param this_inst: instruction the expression is found at
 /// \return true if any instanceof instructionw was replaced
 bool remove_instanceoft::lower_instanceof(
+  const irep_idt &function_identifier,
   exprt &expr,
   goto_programt &goto_program,
   goto_programt::targett this_inst)
@@ -66,7 +72,7 @@ bool remove_instanceoft::lower_instanceof(
   {
     bool changed = false;
     Forall_operands(it, expr)
-      changed |= lower_instanceof(*it, goto_program, this_inst);
+      changed |= lower_instanceof(function_identifier, *it, goto_program, this_inst);
     return changed;
   }
 
@@ -109,7 +115,7 @@ bool remove_instanceoft::lower_instanceof(
 
   symbolt &clsid_tmp_sym = get_fresh_aux_symbol(
     object_clsid.type(),
-    id2string(this_inst->function),
+    id2string(function_identifier),
     "class_identifier_tmp",
     source_locationt(),
     ID_java,
@@ -117,7 +123,7 @@ bool remove_instanceoft::lower_instanceof(
 
   symbolt &instanceof_result_sym = get_fresh_aux_symbol(
     bool_typet(),
-    id2string(this_inst->function),
+    id2string(function_identifier),
     "instanceof_result_tmp",
     source_locationt(),
     ID_java,
@@ -195,6 +201,7 @@ static bool contains_instanceof(const exprt &e)
 /// \param target: instruction to check for instanceof expressions
 /// \return true if an instanceof has been replaced
 bool remove_instanceoft::lower_instanceof(
+  const irep_idt &function_identifier,
   goto_programt &goto_program,
   goto_programt::targett target)
 {
@@ -210,8 +217,8 @@ bool remove_instanceoft::lower_instanceof(
     ++target;
   }
 
-  return lower_instanceof(target->code, goto_program, target) |
-    lower_instanceof(target->guard, goto_program, target);
+  return lower_instanceof(function_identifier, target->code, goto_program, target) |
+    lower_instanceof(function_identifier, target->guard, goto_program, target);
 }
 
 /// Replace every instanceof in the passed function body with an explicit
@@ -219,7 +226,9 @@ bool remove_instanceoft::lower_instanceof(
 /// Extra auxiliary variables may be introduced into symbol_table.
 /// \param goto_program: The function body to work on.
 /// \return true if one or more instanceof expressions have been replaced
-bool remove_instanceoft::lower_instanceof(goto_programt &goto_program)
+bool remove_instanceoft::lower_instanceof(
+  const irep_idt &function_identifier,
+  goto_programt &goto_program)
 {
   bool changed=false;
   for(goto_programt::instructionst::iterator target=
@@ -227,7 +236,7 @@ bool remove_instanceoft::lower_instanceof(goto_programt &goto_program)
     target!=goto_program.instructions.end();
     ++target)
   {
-    changed=lower_instanceof(goto_program, target) || changed;
+    changed=lower_instanceof(function_identifier, goto_program, target) || changed;
   }
   if(!changed)
     return false;
@@ -244,6 +253,7 @@ bool remove_instanceoft::lower_instanceof(goto_programt &goto_program)
 /// \param class_hierarchy: class hierarchy analysis of symbol_table
 /// \param message_handler: logging output
 void remove_instanceof(
+  const irep_idt &function_identifier,
   goto_programt::targett target,
   goto_programt &goto_program,
   symbol_table_baset &symbol_table,
@@ -251,7 +261,7 @@ void remove_instanceof(
   message_handlert &message_handler)
 {
   remove_instanceoft rem(symbol_table, class_hierarchy, message_handler);
-  rem.lower_instanceof(goto_program, target);
+  rem.lower_instanceof(function_identifier, goto_program, target);
 }
 
 /// Replace every instanceof in the passed function with an explicit
@@ -262,13 +272,14 @@ void remove_instanceof(
 /// \param class_hierarchy: class hierarchy analysis of symbol_table
 /// \param message_handler: logging output
 void remove_instanceof(
+  const irep_idt &function_identifier,
   goto_functionst::goto_functiont &function,
   symbol_table_baset &symbol_table,
   const class_hierarchyt &class_hierarchy,
   message_handlert &message_handler)
 {
   remove_instanceoft rem(symbol_table, class_hierarchy, message_handler);
-  rem.lower_instanceof(function.body);
+  rem.lower_instanceof(function_identifier, function.body);
 }
 
 /// Replace every instanceof in every function with an explicit
@@ -287,7 +298,7 @@ void remove_instanceof(
   remove_instanceoft rem(symbol_table, class_hierarchy, message_handler);
   bool changed=false;
   for(auto &f : goto_functions.function_map)
-    changed=rem.lower_instanceof(f.second.body) || changed;
+    changed=rem.lower_instanceof(f.first, f.second.body) || changed;
   if(changed)
     goto_functions.compute_location_numbers();
 }
