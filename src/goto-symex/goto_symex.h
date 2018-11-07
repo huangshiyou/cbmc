@@ -154,8 +154,9 @@ public:
   virtual void symex_instruction_range(
     statet &,
     const goto_functionst &,
-    const irep_idt &function_identifier,
+    const irep_idt &function_identifier_first,
     goto_programt::const_targett first,
+    const irep_idt &function_identifier_limit,
     goto_programt::const_targett limit);
 
   /// Symexes from the first instruction and the given state, terminating as
@@ -170,8 +171,9 @@ public:
   virtual void symex_instruction_range(
     statet &state,
     const get_goto_functiont &get_goto_function,
-    const irep_idt &function_identifier,
+    const irep_idt &function_identifier_first,
     goto_programt::const_targett first,
+    const irep_idt &function_identifier_limit,
     goto_programt::const_targett limit);
 
   /// \brief Have states been pushed onto the workqueue?

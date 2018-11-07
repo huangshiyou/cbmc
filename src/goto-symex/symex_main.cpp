@@ -251,29 +251,33 @@ void goto_symext::resume_symex_from_saved_state(
 void goto_symext::symex_instruction_range(
   statet &state,
   const goto_functionst &goto_functions,
-  const irep_idt &function_identifier,
+  const irep_idt &function_identifier_first,
   const goto_programt::const_targett first,
+  const irep_idt &function_identifier_limit,
   const goto_programt::const_targett limit)
 {
   symex_instruction_range(
     state,
     get_function_from_goto_functions(goto_functions),
-    function_identifier,
+    function_identifier_first,
     first,
+    function_identifier_limit,
     limit);
 }
 
 void goto_symext::symex_instruction_range(
   statet &state,
   const get_goto_functiont &get_goto_function,
-  const irep_idt &function_identifier,
+  const irep_idt &function_identifier_first,
   const goto_programt::const_targett first,
+  const irep_idt &function_identifier_limit,
   const goto_programt::const_targett limit)
 {
   initialize_entry_point(
-    state, get_goto_function, function_identifier, first, limit);
+    state, get_goto_function, function_identifier_first, first, limit);
   ns = namespacet(outer_symbol_table, state.symbol_table);
-  while(state.source.function != limit->function || state.source.pc != limit)
+  while(state.source.function != function_identifier_limit ||
+        state.source.pc != limit)
     symex_threaded_step(state, get_goto_function);
 }
 
