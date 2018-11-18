@@ -33,59 +33,66 @@ protected:
 
 bool smt2irept::parse()
 {
-  std::stack<irept> stack;
-  result.clear();
-
-  while(true)
+  try
   {
-    switch(next_token())
+    std::stack<irept> stack;
+    result.clear();
+
+    while(true)
     {
-    case END_OF_FILE:
-      error() << "unexpected end of file" << eom;
-      return true;
-
-    case STRING_LITERAL:
-    case NUMERAL:
-    case SYMBOL:
-      if(stack.empty())
+      switch(next_token())
       {
-        result=irept(buffer);
-        return false; // all done!
-      }
-      else
-        stack.top().get_sub().push_back(irept(buffer));
-      break;
+      case END_OF_FILE:
+        error() << "unexpected end of file" << eom;
+        throw smt2_errort();
 
-    case OPEN: // '('
-      // produce sub-irep
-      stack.push(irept());
-      break;
-
-    case CLOSE: // ')'
-      // done with sub-irep
-      if(stack.empty())
-      {
-        error() << "unexpected ')'" << eom;
-        return true;
-      }
-      else
-      {
-        irept tmp=stack.top();
-        stack.pop();
-
+      case STRING_LITERAL:
+      case NUMERAL:
+      case SYMBOL:
         if(stack.empty())
         {
-          result=tmp;
+          result = irept(buffer);
           return false; // all done!
         }
-
-        stack.top().get_sub().push_back(tmp);
+        else
+          stack.top().get_sub().push_back(irept(buffer));
         break;
-      }
 
-    default:
-      return true;
+      case OPEN: // '('
+        // produce sub-irep
+        stack.push(irept());
+        break;
+
+      case CLOSE: // ')'
+        // done with sub-irep
+        if(stack.empty())
+        {
+          error() << "unexpected ')'" << eom;
+          throw smt2_errort();
+        }
+        else
+        {
+          irept tmp = stack.top();
+          stack.pop();
+
+          if(stack.empty())
+          {
+            result = tmp;
+            return false; // all done!
+          }
+
+          stack.top().get_sub().push_back(tmp);
+          break;
+        }
+
+      default:
+        throw smt2_errort();
+      }
     }
+  }
+  catch(smt2_errort)
+  {
+    return true;
   }
 }
 

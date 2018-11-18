@@ -28,35 +28,48 @@ std::ostream &operator<<(std::ostream &out, const smt2_parsert::smt2_format &f)
 
 void smt2_parsert::command_sequence()
 {
+  PRECONDITION(parenthesis_level == 0);
+
   exit=false;
 
   while(next_token()==OPEN)
   {
-    if(next_token()!=SYMBOL)
+    DATA_INVARIANT(parenthesis_level == 1, "incorrect parenthesis nesting");
+
+    try
     {
-      error() << "expected symbol as command" << eom;
-      return;
+      if(next_token() != SYMBOL)
+      {
+        error() << "expected symbol as command" << eom;
+        throw smt2_errort();
+      }
+
+      command(buffer);
+
+      if(exit)
+        return;
+
+      switch(next_token())
+      {
+      case END_OF_FILE:
+        error() << "expected closing parenthesis at end of command,"
+                   " but got EOF"
+                << eom;
+        throw smt2_errort();
+
+      case CLOSE:
+        // what we expect
+        break;
+
+      default:
+        error() << "expected end of command" << eom;
+        throw smt2_errort();
+      }
     }
-
-    command(buffer);
-
-    if(exit)
-      return;
-
-    switch(next_token())
+    catch(smt2_errort)
     {
-    case END_OF_FILE:
-      error() << "expected closing parenthesis at end of command,"
-                 " but got EOF" << eom;
-      return;
-
-    case CLOSE:
-      // what we expect
-      break;
-
-    default:
-      error() << "expected end of command" << eom;
-      return;
+      // consume any tokens till the end of the command
+      skip_to_end_of_list();
     }
   }
 
@@ -88,7 +101,7 @@ void smt2_parsert::ignore_command()
 
     case END_OF_FILE:
       error() << "unexpected EOF in command" << eom;
-      return;
+      throw smt2_errort();
 
     default:
       next_token();
@@ -142,7 +155,7 @@ exprt smt2_parsert::let_expression()
   if(next_token()!=OPEN)
   {
     error() << "expected bindings after let" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
 
   std::vector<std::pair<irep_idt, exprt>> bindings;
@@ -154,7 +167,7 @@ exprt smt2_parsert::let_expression()
     if(next_token()!=SYMBOL)
     {
       error() << "expected symbol in binding" << eom;
-      return nil_exprt();
+      throw smt2_errort();
     }
 
     irep_idt identifier=buffer;
@@ -165,7 +178,7 @@ exprt smt2_parsert::let_expression()
     if(next_token()!=CLOSE)
     {
       error() << "expected ')' after value in binding" << eom;
-      return nil_exprt();
+      throw smt2_errort();
     }
 
     bindings.push_back(
@@ -175,7 +188,7 @@ exprt smt2_parsert::let_expression()
   if(next_token()!=CLOSE)
   {
     error() << "expected ')' at end of bindings" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
 
   // save the renaming map
@@ -196,7 +209,7 @@ exprt smt2_parsert::let_expression()
   if(next_token()!=CLOSE)
   {
     error() << "expected ')' after let" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
 
   exprt result=expr;
@@ -226,7 +239,7 @@ exprt smt2_parsert::quantifier_expression(irep_idt id)
   if(next_token()!=OPEN)
   {
     error() << "expected bindings after " << id << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
 
   std::vector<symbol_exprt> bindings;
@@ -238,7 +251,7 @@ exprt smt2_parsert::quantifier_expression(irep_idt id)
     if(next_token()!=SYMBOL)
     {
       error() << "expected symbol in binding" << eom;
-      return nil_exprt();
+      throw smt2_errort();
     }
 
     irep_idt identifier=buffer;
@@ -248,7 +261,7 @@ exprt smt2_parsert::quantifier_expression(irep_idt id)
     if(next_token()!=CLOSE)
     {
       error() << "expected ')' after sort in binding" << eom;
-      return nil_exprt();
+      throw smt2_errort();
     }
 
     bindings.push_back(symbol_exprt(identifier, type));
@@ -257,7 +270,7 @@ exprt smt2_parsert::quantifier_expression(irep_idt id)
   if(next_token()!=CLOSE)
   {
     error() << "expected ')' at end of bindings" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
 
   // go forwards, add to id_map
@@ -273,7 +286,7 @@ exprt smt2_parsert::quantifier_expression(irep_idt id)
   if(next_token()!=CLOSE)
   {
     error() << "expected ')' after " << id << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
 
   exprt result=expr;
@@ -305,7 +318,7 @@ exprt smt2_parsert::function_application(
   if(op.size()!=f.type.variables().size())
   {
     error() << "wrong number of arguments for function" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
 
   for(std::size_t i=0; i<op.size(); i++)
@@ -313,7 +326,7 @@ exprt smt2_parsert::function_application(
     if(op[i].type() != f.type.variables()[i].type())
     {
       error() << "wrong type for arguments for function" << eom;
-      return nil_exprt();
+      throw smt2_errort();
     }
   }
 
@@ -335,6 +348,7 @@ exprt::operandst smt2_parsert::cast_bv_to_signed(const exprt::operandst &op)
     else if(expr.type().id() != ID_unsignedbv)
     {
       error() << "expected unsigned bitvector" << eom;
+      throw smt2_errort();
     }
     else
     {
@@ -354,7 +368,7 @@ exprt smt2_parsert::cast_bv_to_unsigned(const exprt &expr)
   if(expr.type().id()!=ID_signedbv)
   {
     error() << "expected signed bitvector" << eom;
-    return expr;
+    throw smt2_errort();
   }
 
   const auto width=to_signedbv_type(expr.type()).get_width();
@@ -366,26 +380,24 @@ exprt smt2_parsert::multi_ary(irep_idt id, const exprt::operandst &op)
   if(op.empty())
   {
     error() << "expression must have at least one operand" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
-  else
-  {
-    for(std::size_t i=1; i<op.size(); i++)
-    {
-      if(op[i].type()!=op[0].type())
-      {
-        error() << "expression must have operands with matching types,"
-                   " but got `"
-                << smt2_format(op[0].type()) << "' and `"
-                << smt2_format(op[i].type()) << '\'' << eom;
-        return nil_exprt();
-      }
-    }
 
-    exprt result(id, op[0].type());
-    result.operands() = op;
-    return result;
+  for(std::size_t i = 1; i < op.size(); i++)
+  {
+    if(op[i].type() != op[0].type())
+    {
+      error() << "expression must have operands with matching types,"
+                 " but got `"
+              << smt2_format(op[0].type()) << "' and `"
+              << smt2_format(op[i].type()) << '\'' << eom;
+      throw smt2_errort();
+    }
   }
+
+  exprt result(id, op[0].type());
+  result.operands() = op;
+  return result;
 }
 
 exprt smt2_parsert::binary_predicate(irep_idt id, const exprt::operandst &op)
@@ -393,21 +405,19 @@ exprt smt2_parsert::binary_predicate(irep_idt id, const exprt::operandst &op)
   if(op.size()!=2)
   {
     error() << "expression must have two operands" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
-  else
-  {
-    if(op[0].type()!=op[1].type())
-    {
-      error() << "expression must have operands with matching types,"
-                 " but got `"
-              << smt2_format(op[0].type()) << "' and `"
-              << smt2_format(op[1].type()) << '\'' << eom;
-      return nil_exprt();
-    }
 
-    return binary_predicate_exprt(op[0], id, op[1]);
+  if(op[0].type() != op[1].type())
+  {
+    error() << "expression must have operands with matching types,"
+               " but got `"
+            << smt2_format(op[0].type()) << "' and `"
+            << smt2_format(op[1].type()) << '\'' << eom;
+    throw smt2_errort();
   }
+
+  return binary_predicate_exprt(op[0], id, op[1]);
 }
 
 exprt smt2_parsert::unary(irep_idt id, const exprt::operandst &op)
@@ -415,10 +425,10 @@ exprt smt2_parsert::unary(irep_idt id, const exprt::operandst &op)
   if(op.size()!=1)
   {
     error() << "expression must have one operand" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
-  else
-    return unary_exprt(id, op[0], op[0].type());
+
+  return unary_exprt(id, op[0], op[0].type());
 }
 
 exprt smt2_parsert::binary(irep_idt id, const exprt::operandst &op)
@@ -426,18 +436,16 @@ exprt smt2_parsert::binary(irep_idt id, const exprt::operandst &op)
   if(op.size()!=2)
   {
     error() << "expression must have two operands" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
-  else
-  {
-    if(op[0].type()!=op[1].type())
-    {
-      error() << "expression must have operands with matching types" << eom;
-      return nil_exprt();
-    }
 
-    return binary_exprt(op[0], id, op[1], op[0].type());
+  if(op[0].type() != op[1].type())
+  {
+    error() << "expression must have operands with matching types" << eom;
+    throw smt2_errort();
   }
+
+  return binary_exprt(op[0], id, op[1], op[0].type());
 }
 
 exprt smt2_parsert::function_application()
@@ -451,7 +459,7 @@ exprt smt2_parsert::function_application()
       if(next_token()!=SYMBOL)
       {
         error() << "expected symbol after '_'" << eom;
-        return nil_exprt();
+        throw smt2_errort();
       }
 
       if(has_prefix(buffer, "bv"))
@@ -461,7 +469,7 @@ exprt smt2_parsert::function_application()
         if(next_token()!=NUMERAL)
         {
           error() << "expected numeral as bitvector literal width" << eom;
-          return nil_exprt();
+          throw smt2_errort();
         }
 
         auto width=std::stoll(buffer);
@@ -469,7 +477,7 @@ exprt smt2_parsert::function_application()
         if(next_token()!=CLOSE)
         {
           error() << "expected ')' after bitvector literal" << eom;
-          return nil_exprt();
+          throw smt2_errort();
         }
 
         return from_integer(i, unsignedbv_typet(width));
@@ -477,7 +485,7 @@ exprt smt2_parsert::function_application()
       else
       {
         error() << "unknown indexed identifier " << buffer << eom;
-        return nil_exprt();
+        throw smt2_errort();
       }
     }
     else
@@ -635,7 +643,7 @@ exprt smt2_parsert::function_application()
         if(op.size()!=2)
         {
           error() << "concat takes two operands " << op.size() << eom;
-          return nil_exprt();
+          throw smt2_errort();
         }
 
         auto width0=to_unsignedbv_type(op[0].type()).get_width();
@@ -655,19 +663,19 @@ exprt smt2_parsert::function_application()
         if(op.size()!=3)
         {
           error() << "ite takes three operands" << eom;
-          return nil_exprt();
+          throw smt2_errort();
         }
 
         if(op[0].type().id()!=ID_bool)
         {
           error() << "ite takes a boolean as first operand" << eom;
-          return nil_exprt();
+          throw smt2_errort();
         }
 
         if(op[1].type()!=op[2].type())
         {
           error() << "ite needs matching types" << eom;
-          return nil_exprt();
+          throw smt2_errort();
         }
 
         return if_exprt(op[0], op[1], op[2]);
@@ -696,7 +704,7 @@ exprt smt2_parsert::function_application()
         }
 
         error() << "2 unknown symbol " << id << eom;
-        return nil_exprt();
+        throw smt2_errort();
       }
     }
     break;
@@ -711,7 +719,7 @@ exprt smt2_parsert::function_application()
         if(next_token()!=SYMBOL)
         {
           error() << "expected symbol after '_'" << eom;
-          return nil_exprt();
+          throw smt2_errort();
         }
 
         irep_idt id=buffer; // hash it
@@ -721,7 +729,7 @@ exprt smt2_parsert::function_application()
           if(next_token()!=NUMERAL)
           {
             error() << "expected numeral after extract" << eom;
-            return nil_exprt();
+            throw smt2_errort();
           }
 
           auto upper=std::stoll(buffer);
@@ -729,7 +737,7 @@ exprt smt2_parsert::function_application()
           if(next_token()!=NUMERAL)
           {
             error() << "expected two numerals after extract" << eom;
-            return nil_exprt();
+            throw smt2_errort();
           }
 
           auto lower=std::stoll(buffer);
@@ -737,7 +745,7 @@ exprt smt2_parsert::function_application()
           if(next_token()!=CLOSE)
           {
             error() << "expected ')' after extract" << eom;
-            return nil_exprt();
+            throw smt2_errort();
           }
 
           auto op=operands();
@@ -745,7 +753,7 @@ exprt smt2_parsert::function_application()
           if(op.size()!=1)
           {
             error() << "extract takes one operand" << eom;
-            return nil_exprt();
+            throw smt2_errort();
           }
 
           auto upper_e=from_integer(upper, integer_typet());
@@ -754,7 +762,7 @@ exprt smt2_parsert::function_application()
           if(upper<lower)
           {
             error() << "extract got bad indices" << eom;
-            return nil_exprt();
+            throw smt2_errort();
           }
 
           unsignedbv_typet t(upper-lower+1);
@@ -770,7 +778,7 @@ exprt smt2_parsert::function_application()
           if(next_token()!=NUMERAL)
           {
             error() << "expected numeral after " << id << eom;
-            return nil_exprt();
+            throw smt2_errort();
           }
 
           auto index=std::stoll(buffer);
@@ -778,7 +786,7 @@ exprt smt2_parsert::function_application()
           if(next_token()!=CLOSE)
           {
             error() << "expected ')' after " << id << " index" << eom;
-            return nil_exprt();
+            throw smt2_errort();
           }
 
           auto op=operands();
@@ -786,7 +794,7 @@ exprt smt2_parsert::function_application()
           if(op.size()!=1)
           {
             error() << id << " takes one operand" << eom;
-            return nil_exprt();
+            throw smt2_errort();
           }
 
           if(id=="rotate_left")
@@ -825,7 +833,7 @@ exprt smt2_parsert::function_application()
         else
         {
           error() << "unknown indexed identifier " << buffer << eom;
-          return nil_exprt();
+          throw smt2_errort();
         }
       }
       else
@@ -837,7 +845,10 @@ exprt smt2_parsert::function_application()
         exprt tmp=expression();
 
         if(next_token()!=CLOSE && next_token()!=CLOSE)
+        {
           error() << "mismatched parentheses in an expression" << eom;
+          throw smt2_errort();
+        }
 
         return tmp;
       }
@@ -851,7 +862,10 @@ exprt smt2_parsert::function_application()
       exprt tmp=expression();
 
       if(next_token()!=CLOSE && next_token()!=CLOSE)
+      {
         error() << "mismatched parentheses in an expression" << eom;
+        throw smt2_errort();
+      }
 
       return tmp;
     }
@@ -864,7 +878,10 @@ exprt smt2_parsert::function_application()
 
     exprt tmp=expression();
     if(next_token()!=CLOSE)
+    {
       error() << "mismatched parentheses in an expression" << eom;
+      throw smt2_errort();
+    }
 
     return tmp;
   }
@@ -892,7 +909,7 @@ exprt smt2_parsert::expression()
           return symbol_exprt(final_id, id_it->second.type);
 
         error() << "1 unknown symbol " << identifier << eom;
-        return nil_exprt();
+        throw smt2_errort();
       }
     }
 
@@ -925,11 +942,11 @@ exprt smt2_parsert::expression()
 
   case END_OF_FILE:
     error() << "EOF in an expression" << eom;
-    return nil_exprt();
+    throw smt2_errort();
 
   default:
     error() << "unexpected token in an expression" << eom;
-    return nil_exprt();
+    throw smt2_errort();
   }
 }
 
@@ -947,14 +964,14 @@ typet smt2_parsert::sort()
     else
     {
       error() << "unexpected sort: `" << buffer << '\'' << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
 
   case OPEN:
     if(next_token()!=SYMBOL)
     {
       error() << "expected symbol after '(' in a sort " << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
 
     if(buffer=="_")
@@ -963,7 +980,7 @@ typet smt2_parsert::sort()
       if(next_token()!=SYMBOL)
       {
         error() << "expected symbol after '_' in a sort" << eom;
-        return nil_typet();
+        throw smt2_errort();
       }
 
       if(buffer=="BitVec")
@@ -971,7 +988,7 @@ typet smt2_parsert::sort()
         if(next_token()!=NUMERAL)
         {
           error() << "expected numeral as bit-width" << eom;
-          return nil_typet();
+          throw smt2_errort();
         }
 
         auto width=std::stoll(buffer);
@@ -980,7 +997,7 @@ typet smt2_parsert::sort()
         if(next_token()!=CLOSE)
         {
           error() << "expected ')' at end of sort" << eom;
-          return nil_typet();
+          throw smt2_errort();
         }
 
         return unsignedbv_typet(width);
@@ -988,7 +1005,7 @@ typet smt2_parsert::sort()
       else
       {
         error() << "unexpected sort: `" << buffer << '\'' << eom;
-        return nil_typet();
+        throw smt2_errort();
       }
     }
     else if(buffer == "Array")
@@ -1001,7 +1018,7 @@ typet smt2_parsert::sort()
       if(next_token() != CLOSE)
       {
         error() << "expected ')' at end of Array sort" << eom;
-        return nil_typet();
+        throw smt2_errort();
       }
 
       // we can turn arrays that map an unsigned bitvector type
@@ -1014,18 +1031,18 @@ typet smt2_parsert::sort()
       else
       {
         error() << "unsupported array sort" << eom;
-        return nil_typet();
+        throw smt2_errort();
       }
     }
     else
     {
       error() << "unexpected sort: `" << buffer << '\'' << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
 
   default:
     error() << "unexpected token in a sort " << buffer << eom;
-    return nil_typet();
+    throw smt2_errort();
   }
 }
 
@@ -1034,7 +1051,7 @@ typet smt2_parsert::function_signature_definition()
   if(next_token()!=OPEN)
   {
     error() << "expected '(' at beginning of signature" << eom;
-    return nil_typet();
+    throw smt2_errort();
   }
 
   if(peek()==CLOSE)
@@ -1050,13 +1067,13 @@ typet smt2_parsert::function_signature_definition()
     if(next_token()!=OPEN)
     {
       error() << "expected '(' at beginning of parameter" << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
 
     if(next_token()!=SYMBOL)
     {
       error() << "expected symbol in parameter" << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
 
     mathematical_function_typet::variablet var;
@@ -1072,7 +1089,7 @@ typet smt2_parsert::function_signature_definition()
     if(next_token()!=CLOSE)
     {
       error() << "expected ')' at end of parameter" << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
   }
 
@@ -1088,7 +1105,7 @@ typet smt2_parsert::function_signature_declaration()
   if(next_token()!=OPEN)
   {
     error() << "expected '(' at beginning of signature" << eom;
-    return nil_typet();
+    throw smt2_errort();
   }
 
   if(peek()==CLOSE)
@@ -1104,13 +1121,13 @@ typet smt2_parsert::function_signature_declaration()
     if(next_token()!=OPEN)
     {
       error() << "expected '(' at beginning of parameter" << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
 
     if(next_token()!=SYMBOL)
     {
       error() << "expected symbol in parameter" << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
 
     mathematical_function_typet::variablet var;
@@ -1120,7 +1137,7 @@ typet smt2_parsert::function_signature_declaration()
     if(next_token()!=CLOSE)
     {
       error() << "expected ')' at end of parameter" << eom;
-      return nil_typet();
+      throw smt2_errort();
     }
   }
 
@@ -1140,21 +1157,20 @@ void smt2_parsert::command(const std::string &c)
     if(next_token()!=SYMBOL)
     {
       error() << "expected a symbol after " << c << eom;
-      ignore_command();
-      return;
+      throw smt2_errort();
     }
 
-    irep_idt id=buffer;
+    irep_idt id = buffer;
+    auto type = sort();
 
     if(id_map.find(id)!=id_map.end())
     {
       error() << "identifier `" << id << "' defined twice" << eom;
-      ignore_command();
-      return;
+      throw smt2_errort();
     }
 
     auto &entry = id_map[id];
-    entry.type = sort();
+    entry.type = type;
     entry.definition = nil_exprt();
   }
   else if(c=="declare-fun")
@@ -1162,30 +1178,28 @@ void smt2_parsert::command(const std::string &c)
     if(next_token()!=SYMBOL)
     {
       error() << "expected a symbol after declare-fun" << eom;
-      ignore_command();
-      return;
+      throw smt2_errort();
     }
 
     irep_idt id=buffer;
+    auto type = function_signature_declaration();
 
     if(id_map.find(id)!=id_map.end())
     {
       error() << "identifier `" << id << "' defined twice" << eom;
-      ignore_command();
-      return;
+      throw smt2_errort();
     }
 
-    auto &entry=id_map[id];
-    entry.type=function_signature_declaration();
-    entry.definition=nil_exprt();
+    auto &entry = id_map[id];
+    entry.type = type;
+    entry.definition = nil_exprt();
   }
   else if(c=="define-fun")
   {
     if(next_token()!=SYMBOL)
     {
       error() << "expected a symbol after define-fun" << eom;
-      ignore_command();
-      return;
+      throw smt2_errort();
     }
 
     const irep_idt id=buffer;
@@ -1193,15 +1207,11 @@ void smt2_parsert::command(const std::string &c)
     if(id_map.find(id)!=id_map.end())
     {
       error() << "identifier `" << id << "' defined twice" << eom;
-      ignore_command();
-      return;
+      throw smt2_errort();
     }
 
-    // create the entry
-    id_map[id];
-
-    auto signature=function_signature_definition();
-    exprt body=expression();
+    const auto signature = function_signature_definition();
+    const auto body = expression();
 
     // check type of body
     if(signature.id() == ID_mathematical_function)
@@ -1212,7 +1222,7 @@ void smt2_parsert::command(const std::string &c)
         error() << "type mismatch in function definition: expected `"
                 << smt2_format(f_signature.codomain()) << "' but got `"
                 << smt2_format(body.type()) << '\'' << eom;
-        return;
+        throw smt2_errort();
       }
     }
     else if(body.type() != signature)
@@ -1220,10 +1230,10 @@ void smt2_parsert::command(const std::string &c)
       error() << "type mismatch in function definition: expected `"
               << smt2_format(signature) << "' but got `"
               << smt2_format(body.type()) << '\'' << eom;
-      return;
+      throw smt2_errort();
     }
 
-    // set up the entry
+    // create the entry
     auto &entry=id_map[id];
     entry.type=signature;
     entry.definition=body;

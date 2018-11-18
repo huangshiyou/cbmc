@@ -9,6 +9,7 @@ Author: Daniel Kroening, kroening@kroening.com
 #ifndef CPROVER_SOLVERS_SMT2_SMT2_TOKENIZER_H
 #define CPROVER_SOLVERS_SMT2_SMT2_TOKENIZER_H
 
+#include <util/exception_utils.h>
 #include <util/parser.h>
 
 #include <string>
@@ -31,8 +32,15 @@ public:
 protected:
   std::string buffer;
   bool ok, peeked;
-  using tokent=enum { NONE, END_OF_FILE, ERROR, STRING_LITERAL,
-                      NUMERAL, SYMBOL, OPEN, CLOSE };
+  using tokent = enum {
+    NONE,
+    END_OF_FILE,
+    STRING_LITERAL,
+    NUMERAL,
+    SYMBOL,
+    OPEN,
+    CLOSE
+  };
   tokent token;
 
   tokent next_token();
@@ -59,6 +67,15 @@ protected:
   /// skip any tokens until all parentheses are closed
   /// or the end of file is reached
   void skip_to_end_of_list();
+
+  struct smt2_errort : public cprover_exception_baset
+  {
+    /// this is a dummy -- errors are reported via the error() stream
+    std::string what() const override
+    {
+      return "";
+    }
+  };
 
 private:
   tokent get_decimal_numeral();
